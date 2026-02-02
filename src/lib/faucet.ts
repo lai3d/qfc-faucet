@@ -1,11 +1,9 @@
 import { ethers } from 'ethers';
 
 const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8545';
-const FAUCET_PRIVATE_KEY = process.env.FAUCET_PRIVATE_KEY || '';
 const FAUCET_AMOUNT = process.env.FAUCET_AMOUNT || '10';
 
 let provider: ethers.JsonRpcProvider | null = null;
-let wallet: ethers.Wallet | null = null;
 
 function getProvider(): ethers.JsonRpcProvider {
   if (!provider) {
@@ -14,38 +12,49 @@ function getProvider(): ethers.JsonRpcProvider {
   return provider;
 }
 
-function getWallet(): ethers.Wallet {
-  if (!wallet) {
-    if (!FAUCET_PRIVATE_KEY) {
-      throw new Error('FAUCET_PRIVATE_KEY not configured');
-    }
-    const key = FAUCET_PRIVATE_KEY.startsWith('0x')
-      ? FAUCET_PRIVATE_KEY
-      : `0x${FAUCET_PRIVATE_KEY}`;
-    wallet = new ethers.Wallet(key, getProvider());
-  }
-  return wallet;
-}
+// Faucet address is the Ed25519 address derived from key [0x42; 32]
+const FAUCET_ADDRESS = '0x10d7812fbe50096ae82569fdad35f79628bc0084';
 
 export async function getFaucetAddress(): Promise<string> {
-  return getWallet().address;
+  return FAUCET_ADDRESS;
 }
 
 export async function getFaucetBalance(): Promise<string> {
-  const balance = await getProvider().getBalance(getWallet().address);
+  const balance = await getProvider().getBalance(FAUCET_ADDRESS);
   return ethers.formatEther(balance);
 }
 
+interface FaucetResponse {
+  txHash: string;
+  amount: string;
+  to: string;
+}
+
 export async function sendFaucetTokens(toAddress: string): Promise<string> {
-  const wallet = getWallet();
+  // Use qfc_requestFaucet RPC method which handles Ed25519 signing server-side
   const amount = ethers.parseEther(FAUCET_AMOUNT);
 
-  const tx = await wallet.sendTransaction({
-    to: toAddress,
-    value: amount,
+  const response = await fetch(RPC_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'qfc_requestFaucet',
+      params: [toAddress, `0x${amount.toString(16)}`],
+      id: 1,
+    }),
   });
 
-  return tx.hash;
+  const result = await response.json();
+
+  if (result.error) {
+    throw new Error(result.error.message || 'Faucet request failed');
+  }
+
+  const data = result.result as FaucetResponse;
+  return data.txHash;
 }
 
 export function getFaucetAmount(): string {
