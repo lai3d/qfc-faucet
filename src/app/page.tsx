@@ -82,6 +82,13 @@ export default function FaucetPage() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Convert wei to QFC (divide by 10^18)
+  const formatQFC = (weiAmount: string) => {
+    const wei = BigInt(weiAmount);
+    const qfc = Number(wei / BigInt(10 ** 18));
+    return qfc.toLocaleString();
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-lg">
@@ -111,7 +118,7 @@ export default function FaucetPage() {
                 <div>
                   <span className="text-gray-500">Per Request</span>
                   <div className="font-semibold text-lg">
-                    {faucetInfo.amount} QFC
+                    {formatQFC(faucetInfo.amount)} QFC
                   </div>
                 </div>
               </div>
