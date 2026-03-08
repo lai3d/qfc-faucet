@@ -16,10 +16,15 @@ import {
 // GET /api/faucet - Get faucet info
 export async function GET() {
   try {
-    const [address, balance] = await Promise.all([
-      getFaucetAddress(),
-      getFaucetBalance(),
-    ]);
+    const address = await getFaucetAddress();
+
+    // Balance fetch may fail (e.g. RPC serialization error), handle gracefully
+    let balance: string | null = null;
+    try {
+      balance = await getFaucetBalance();
+    } catch (error) {
+      console.error('Failed to fetch faucet balance:', error);
+    }
 
     return NextResponse.json({
       success: true,
